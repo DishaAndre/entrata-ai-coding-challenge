@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { globalCache } from './fetchLayer';
+import { globalCache, fetchWithCache } from './fetchLayer';
 
 export default function CacheDemo() {
   const [filter, setFilter] = useState('all');
@@ -16,30 +16,42 @@ export default function CacheDemo() {
     ]);
   };
 
-  const fetchData = async (statusFilter) => {
-    const endpoint = '/api/users';
-    const params = statusFilter !== 'all' ? { status: statusFilter } : {};
-    const cached = globalCache.get(endpoint, params);
+  // Mocked backend network request handler
+  const mockFetchServer = async (endpoint, params, headers) => {
+    const filteredData = params.status 
+      ? mockDb.filter((u) => u.status === params.status)
+      : mockDb;
 
-    if (cached && !cached.isStale) {
-      addLog(`CACHE HIT [${statusFilter}]: Returned ${cached.data.length} items`, 'hit');
-      return;
+    const generatedETag = `W/"${JSON.stringify(filteredData).length}"`;
+
+    // Simulate 304 Not Modified if ETag matches
+    if (headers['If-None-Match'] === generatedETag) {
+      return { status: 304, data: null, headers: { etag: generatedETag } };
     }
 
-    // Mock API Fetch
-    const filteredData = statusFilter === 'all' 
-      ? mockDb 
-      : mockDb.filter((u) => u.status === statusFilter);
+    return { status: 200, data: filteredData, headers: { etag: generatedETag } };
+  };
 
-    globalCache.set(endpoint, params, filteredData);
-    addLog(`CACHE MISS [${statusFilter}]: Fetched ${filteredData.length} items from server`, 'miss');
+  const handleFetch = async () => {
+    const endpoint = '/api/users';
+    const params = filter !== 'all' ? { status: filter } : {};
+
+    const result = await fetchWithCache(endpoint, params, mockFetchServer);
+
+    if (result.source === 'cache') {
+      addLog(`CACHE HIT [${filter}]: Returned ${result.data.length} items from cache`, 'hit');
+    } else if (result.source === 'etag-revalidated') {
+      addLog(`ETAG 304 NOT MODIFIED [${filter}]: Revalidated cache via ETag`, 'hit');
+    } else {
+      addLog(`CACHE MISS / NETWORK FETCH [${filter}]: Fetched ${result.data.length} items from server`, 'miss');
+    }
   };
 
   const handleMutation = () => {
     const newUser = { id: Date.now(), name: `User_${mockDb.length + 1}`, status: 'active' };
     setMockDb((prev) => [...prev, newUser]);
-    
-    // Invalidate cache for updated resource endpoint
+
+    // Invalidate matching endpoints in cache
     globalCache.invalidate('/api/users');
     addLog('MUTATION EXECUTED: Added new user & invalidated /api/users cache', 'mutation');
   };
@@ -60,7 +72,7 @@ export default function CacheDemo() {
         </select>
 
         <button
-          onClick={() => fetchData(filter)}
+          onClick={handleFetch}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition shadow-sm h-[40px]"
         >
           Fetch Data (Filter: {filter})
