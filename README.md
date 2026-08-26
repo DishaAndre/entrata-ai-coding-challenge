@@ -1,6 +1,4 @@
 
-
-````markdown
 # Entrata AI Coding Challenge
 
 A full-stack React application demonstrating robust client-side form validation, accessible UX patterns, and a query cache layer with mutation invalidation to prevent stale reads.
