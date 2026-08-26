@@ -107,6 +107,14 @@ src/
 ├── main.jsx
 └── setupTests.js
 ```
+---
 
-```
-```
+## Trade-offs & Future Work
+
+### Trade-offs
+* **In-Memory Cache vs. Persistent Storage:** The current caching layer relies on in-memory storage, which clears upon page refreshes. This choice prioritizes simple client-side performance for single sessions over offline persistence.
+* **Simplistic Regex Phone Parsing:** Phone validation enforces basic country-code formatting without forcing specific country dropdowns. This keeps form submission friction minimal while meeting core validation specs.
+
+### Future Work
+* **Persistent Cache Storage:** Expand the custom cache layer to sync with `localStorage` or `IndexedDB` to retain query hits across full browser reloads.
+* **Advanced Phone Input Parsing:** Integrate an international phone library (such as `libphonenumber-js`) for dynamic flag selection and localized format validation.
